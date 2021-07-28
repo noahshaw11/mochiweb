@@ -34,7 +34,8 @@ hexdigit(C) when C < 16 -> $A + (C - 10).
 unhexdigit(C) when C >= $0, C =< $9 -> C - $0;
 unhexdigit(C) when C >= $a, C =< $f -> C - $a + 10;
 unhexdigit(C) when C >= $A, C =< $F -> C - $A + 10.
-unhexdigit(Hi, Lo) ->
+
+unhex(Hi, Lo) ->
     unhexdigit(Lo) bor (unhexdigit(Hi) bsl 4).
 
 %% @spec partition(String, Sep) -> {String, [], []} | {Prefix, Sep, Postfix}
@@ -258,7 +259,7 @@ qs_revdecode([], Acc) ->
 qs_revdecode([$+ | Rest], Acc) ->
     qs_revdecode(Rest, [$\s | Acc]);
 qs_revdecode([Lo, Hi, ?PERCENT | Rest], Acc) when ?IS_HEX(Lo), ?IS_HEX(Hi) ->
-    qs_revdecode(Rest, [(unhexdigit(Hi, Lo)) | Acc]);
+    qs_revdecode(Rest, [(unhex(Hi, Lo)) | Acc]);
 qs_revdecode([C | Rest], Acc) ->
     qs_revdecode(Rest, [C | Acc]).
 
@@ -267,17 +268,17 @@ qs_revdecode([C | Rest], Acc) ->
 unquote_path(Binary) when is_binary(Binary) ->
     unquote_path(binary_to_list(Binary));
 unquote_path(String) ->
-    qs_revdecode_path(lists:reverse(String)).
+    revdecode_path(lists:reverse(String)).
 
-qs_revdecode_path(S) ->
-    qs_revdecode_path(S, []).
+revdecode_path(S) ->
+    revdecode_path(S, []).
 
-qs_revdecode_path([], Acc) ->
+revdecode_path([], Acc) ->
     Acc;
-qs_revdecode_path([Lo, Hi, ?PERCENT | Rest], Acc) when ?IS_HEX(Lo), ?IS_HEX(Hi) ->
-    qs_revdecode_path(Rest, [(unhexdigit(Hi, Lo)) | Acc]);
-qs_revdecode_path([C | Rest], Acc) ->
-    qs_revdecode_path(Rest, [C | Acc]).
+revdecode_path([Lo, Hi, ?PERCENT | Rest], Acc) when ?IS_HEX(Lo), ?IS_HEX(Hi) ->
+    revdecode_path(Rest, [(unhex(Hi, Lo)) | Acc]);
+revdecode_path([C | Rest], Acc) ->
+    revdecode_path(Rest, [C | Acc]).
 
 %% @spec urlsplit(Url) -> {Scheme, Netloc, Path, Query, Fragment}
 %% @doc Return a 5-tuple, does not expand % escapes. Only supports HTTP style
@@ -824,6 +825,17 @@ quote_plus_test() ->
 
 unquote_test() ->
     ?assertEqual("foo bar",
+                 unquote("foo+bar")),
+    ?assertEqual("foo bar",
+                 unquote("foo%20bar")),
+    ?assertEqual("foo\r\n",
+                 unquote("foo%0D%0A")),
+    ?assertEqual("foo\r\n",
+                 unquote(<<"foo%0D%0A">>)),
+    ok.
+
+unquote_path_test() ->
+    ?assertEqual("foo+bar",
                  unquote("foo+bar")),
     ?assertEqual("foo bar",
                  unquote("foo%20bar")),
